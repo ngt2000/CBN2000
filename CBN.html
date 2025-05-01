@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversor de Moedas</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      padding: 20px;
+      margin: 0;
+      text-align: center;
+    }
+
+    .converter {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 500px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #007bff;
+      border: none;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #resultado {
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    canvas {
+      margin-top: 30px;
+      width: 100% !important;
+      height: auto !important;
+    }
+
+    @media (max-width: 600px) {
+      .converter {
+        padding: 15px;
+      }
+
+      input, select, button {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="converter">
+    <h2>Conversor de Moedas</h2>
+    <input type="number" id="valor" placeholder="Digite o valor" />
+    
+    <select id="moedaOrigem">
+      <option value="BRL">Real (BRL)</option>
+      <option value="USD">Dólar (USD)</option>
+      <option value="EUR">Euro (EUR)</option>
+      <option value="GBP">Libra (GBP)</option>
+      <option value="JPY">Iene (JPY)</option>
+      <option value="CAD">Dólar Canadense (CAD)</option>
+      <option value="AUD">Dólar Australiano (AUD)</option>
+    </select>
+
+    <select id="moedaDestino">
+      <option value="USD">Dólar (USD)</option>
+      <option value="BRL">Real (BRL)</option>
+      <option value="EUR">Euro (EUR)</option>
+      <option value="GBP">Libra (GBP)</option>
+      <option value="JPY">Iene (JPY)</option>
+      <option value="CAD">Dólar Canadense (CAD)</option>
+      <option value="AUD">Dólar Australiano (AUD)</option>
+    </select>
+
+    <button onclick="converter()">Converter</button>
+    <div id="resultado"></div>
+    <canvas id="grafico"></canvas>
+  </div>
+
+  <script>
+    let chart;
+
+    async function converter() {
+      const valor = parseFloat(document.getElementById('valor').value);
+      const origem = document.getElementById('moedaOrigem').value;
+      const destino = document.getElementById('moedaDestino').value;
+
+      if (!valor || origem === "" || destino === "") {
+        document.getElementById('resultado').innerText = "Preencha todos os campos corretamente.";
+        return;
+      }
+
+      if (origem === destino) {
+        document.getElementById('resultado').innerText = `Resultado: ${valor.toFixed(2)} ${destino}`;
+        return;
+      }
+
+      try {
+        const url = `https://api.exchangerate.host/convert?from=${origem}&to=${destino}&amount=${valor}`;
+        const resposta = await fetch(url);
+        const dados = await resposta.json();
+        const resultado = dados.result;
+        document.getElementById('resultado').innerText = `Resultado: ${resultado.toFixed(2)} ${destino}`;
+
+        // Histórico de 7 dias
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - 6);
+
+        const formatarData = (d) => d.toISOString().split("T")[0];
+        const historyURL = `https://api.exchangerate.host/timeseries?start_date=${formatarData(startDate)}&end_date=${formatarData(endDate)}&base=${origem}&symbols=${destino}`;
+        const historyRes = await fetch(historyURL);
+        const historyData = await historyRes.json();
+
+        const labels = [];
+        const values = [];
+
+        for (let data in historyData.rates) {
+          labels.push(data);
+          values.push(historyData.rates[data][destino]);
+        }
+
+        atualizarGrafico(labels, values, destino);
+      } catch (erro) {
+        document.getElementById('resultado').innerText = "Erro ao buscar dados.";
+        console.error(erro);
+      }
+    }
+
+    function atualizarGrafico(labels, valores, moeda) {
+      const ctx = document.getElementById('grafico').getContext('2d');
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: `Últimos 7 dias (${moeda})`,
+            data: valores,
+            borderColor: 'blue',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: false
+            }
+          }
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>
